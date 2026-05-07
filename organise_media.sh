@@ -749,12 +749,12 @@ if [[ -z "$OMDB_API_KEY" ]]; then
     echo ""
 fi
 
-mkdir -p "$MOVIES" "$TV"
-
 if $SHOW_MEDIA; then
     show_pi_media
     exit 0
 fi
+
+mkdir -p "$MOVIES" "$TV"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
