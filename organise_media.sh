@@ -650,8 +650,7 @@ cleanup_sources() {
         while IFS= read -r dir; do
             [[ -z "$dir" ]] && continue
             if [[ -d "$dir" ]] && [[ "$dir" != "$DOWNLOADS" ]]; then
-                find "$dir" -mindepth 1 -delete 2>/dev/null || true
-                rmdir "$dir" 2>/dev/null && echo "  🗑  Removed dir: $(basename "$dir")" || true
+                rm -rf "$dir" && echo "  🗑  Removed dir: $(basename "$dir")" || true
             fi
         done <<< "$unique_dirs"
     fi
