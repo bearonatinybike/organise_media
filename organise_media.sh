@@ -721,12 +721,12 @@ sync_to_pi() {
 
     if [[ -d "$src/Movies" ]]; then
         echo "📡  Movies: ~/Temp/Movies/ → pi:media/Movies/"
-        rsync -avz --progress "$src/Movies/" "pi:media/Movies/"
+        rsync -avz --progress --exclude='.DS_Store' "$src/Movies/" "pi:media/Movies/"
     fi
 
     if [[ -d "$src/TV" ]]; then
         echo "📡  TV: ~/Temp/TV/ → pi:media/TV/"
-        rsync -avz --progress "$src/TV/" "pi:media/TV/"
+        rsync -avz --progress --exclude='.DS_Store' "$src/TV/" "pi:media/TV/"
     fi
 
     echo ""
