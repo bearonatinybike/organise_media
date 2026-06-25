@@ -415,6 +415,7 @@ process_tv() {
     raw_title=$(echo "$stem" | sed -E 's/[. _]?[Ss][0-9]{1,2}[Ee][0-9]{1,2}(-?[Ee][0-9]{1,2})?.*//')
     raw_title=$(dots_to_spaces "$raw_title")
     raw_title=$(strip_tags "$raw_title")
+    raw_title=$(echo "$raw_title" | sed -E 's/[-[:space:]]+$//')
 
     show_year=$(echo "$raw_title" | grep -oE '\(?(19|20)[0-9]{2}\)?$' | grep -oE '[0-9]{4}' || true)
     [[ -n "$show_year" ]] && raw_title=$(echo "$raw_title" | sed -E "s/ *\(?$show_year\)? *$//")
