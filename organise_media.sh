@@ -659,10 +659,10 @@ cleanup_sources() {
     echo "✓   Done."
 }
 
-# ── Pi media library summary (via SSH) ───────────────────────────────────────
+# ── linuxvm media library summary (via SSH) ───────────────────────────────────
 
-show_pi_media() {
-    ssh pi bash << 'REMOTE'
+show_linuxvm_media() {
+    ssh linuxvm bash << 'REMOTE'
 is_video() {
     local ext="${1##*.}"; ext=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
     for e in mkv mp4 avi m4v mov wmv mpg mpeg; do [[ "$ext" == "$e" ]] && return 0; done
@@ -711,22 +711,22 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 REMOTE
 }
 
-# ── Sync organised files to Pi ────────────────────────────────────────────────
+# ── Sync organised files to linuxvm ───────────────────────────────────────────
 
-sync_to_pi() {
+sync_to_linuxvm() {
     local src="$HOME/Temp"
 
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
     if [[ -d "$src/Movies" ]]; then
-        echo "📡  Movies: ~/Temp/Movies/ → pi:media/Movies/"
-        rsync -avz --progress --exclude='.DS_Store' "$src/Movies/" "pi:media/Movies/"
+        echo "📡  Movies: ~/Temp/Movies/ → linuxvm:media/Movies/"
+        rsync -avz --progress --exclude='.DS_Store' "$src/Movies/" "linuxvm:media/Movies/"
     fi
 
     if [[ -d "$src/TV" ]]; then
-        echo "📡  TV: ~/Temp/TV/ → pi:media/TV/"
-        rsync -avz --progress --exclude='.DS_Store' "$src/TV/" "pi:media/TV/"
+        echo "📡  TV: ~/Temp/TV/ → linuxvm:media/TV/"
+        rsync -avz --progress --exclude='.DS_Store' "$src/TV/" "linuxvm:media/TV/"
     fi
 
     echo ""
@@ -735,7 +735,7 @@ sync_to_pi() {
     echo "  ✓  Cleared ~/Temp/"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-    show_pi_media
+    show_linuxvm_media
 }
 
 # ── Warn if OMDb key is missing ───────────────────────────────────────────────
@@ -750,7 +750,7 @@ if [[ -z "$OMDB_API_KEY" ]]; then
 fi
 
 if $SHOW_MEDIA; then
-    show_pi_media
+    show_linuxvm_media
     exit 0
 fi
 
@@ -795,7 +795,7 @@ echo ""
 
 if ! $DRY_RUN && (( ${#SOURCE_PATHS[@]} > 0 )); then
     cleanup_sources
-    sync_to_pi
+    sync_to_linuxvm
     echo ""
 fi
 

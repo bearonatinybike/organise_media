@@ -6,8 +6,8 @@ A pair of Bash scripts that rename and sort video downloads into a clean `Movies
 
 | Script | For | Output |
 |---|---|---|
-| `organise_media.sh` | Mac | `~/Temp/Movies` and `~/Temp/TV`, then rsync to Pi |
-| `organise_media_pi.sh` | Raspberry Pi | `~/media/Movies` and `~/media/TV` |
+| `organise_media.sh` | Mac | `~/Temp/Movies` and `~/Temp/TV`, then rsync to linuxvm |
+| `organise_media_linuxvm.sh` | linuxvm | `~/media/Movies` and `~/media/TV` |
 
 ## How it works
 
@@ -19,7 +19,7 @@ A pair of Bash scripts that rename and sort video downloads into a clean `Movies
    - TV: `~/Temp/TV/<Show Name (Year)>/Season XX/<Show Name (Year)> SxxExx.ext`
    - Movies: `~/Temp/Movies/<Movie Title (Year)>.ext`
 6. Saves confirmed titles to a local corrections database so repeat runs skip the API lookup
-7. After processing, the Mac script rsyncs the sorted files to `pi:media/` and clears `~/Temp`
+7. After processing, the Mac script rsyncs the sorted files to `linuxvm:media/` and clears `~/Temp`
 
 ## Requirements
 
@@ -27,7 +27,7 @@ A pair of Bash scripts that rename and sort video downloads into a clean `Movies
 - `curl`
 - `python3`
 - OMDb API key for movie lookups — free at https://www.omdbapi.com/apikey.aspx
-- SSH alias `pi` configured in `~/.ssh/config` (Mac script only)
+- SSH alias `linuxvm` configured in `~/.ssh/config` (Mac script only)
 
 ## Setup
 
