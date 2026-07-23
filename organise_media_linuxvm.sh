@@ -8,6 +8,14 @@
 # Set your OMDb key here or export OMDB_API_KEY=yourkey before running:
 OMDB_API_KEY="${OMDB_API_KEY:-}"
 
+# Re-exec under idle I/O priority unless already wrapped — keeps this bulk
+# file-moving job from starving other concurrent access (Jellyfin, Samba,
+# WebDAV) to the shared USB drive.
+if [[ -z "${ORGANISE_MEDIA_IONICE:-}" ]] && command -v ionice &>/dev/null; then
+    export ORGANISE_MEDIA_IONICE=1
+    exec ionice -c3 "$0" "$@"
+fi
+
 set -euo pipefail
 
 DOWNLOADS="$HOME/Downloads"
