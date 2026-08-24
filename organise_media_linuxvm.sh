@@ -309,7 +309,7 @@ db_save() {
     # Remove any existing entry for this key, then append
     local tmp
     tmp=$(mktemp)
-    grep -v $'^('"$key"$'\t)' "$DB_FILE" > "$tmp" 2>/dev/null || true
+    grep -v -P "^\Q$key\E\t" "$DB_FILE" > "$tmp" 2>/dev/null || true
     printf '%s\t%s\n' "$key" "$confirmed" >> "$tmp"
     mv "$tmp" "$DB_FILE"
     echo "  💾  Saved to corrections DB: \"$confirmed\"" >&2
