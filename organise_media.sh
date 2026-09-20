@@ -8,20 +8,12 @@
 # Set your OMDb key here or export OMDB_API_KEY=yourkey before running:
 OMDB_API_KEY="${OMDB_API_KEY:-}"
 
-# Re-exec under idle I/O priority unless already wrapped — keeps this bulk
-# file-moving job from starving other concurrent access (Jellyfin, Samba,
-# WebDAV) to the shared USB drive.
-if [[ -z "${ORGANISE_MEDIA_IONICE:-}" ]] && command -v ionice &>/dev/null; then
-    export ORGANISE_MEDIA_IONICE=1
-    exec ionice -c3 "$0" "$@"
-fi
-
 set -euo pipefail
 
 DOWNLOADS="$HOME/Downloads"
-MEDIA="$HOME/media"
-MOVIES="$HOME/media/Movies"
-TV="$HOME/media/TV"
+MEDIA="$HOME/Temp"
+MOVIES="$HOME/Temp/Movies"
+TV="$HOME/Temp/TV"
 
 # ── Title corrections database ────────────────────────────────────────────────
 # Stores confirmed API titles so apostrophes (and other corrections) are
@@ -309,7 +301,7 @@ db_save() {
     # Remove any existing entry for this key, then append
     local tmp
     tmp=$(mktemp)
-    grep -v $'^('"$key"$'\t)' "$DB_FILE" > "$tmp" 2>/dev/null || true
+    grep -v -P "^\Q$key\E\t" "$DB_FILE" > "$tmp" 2>/dev/null || true
     printf '%s\t%s\n' "$key" "$confirmed" >> "$tmp"
     mv "$tmp" "$DB_FILE"
     echo "  💾  Saved to corrections DB: \"$confirmed\"" >&2
@@ -423,6 +415,7 @@ process_tv() {
     raw_title=$(echo "$stem" | sed -E 's/[. _]?[Ss][0-9]{1,2}[Ee][0-9]{1,2}(-?[Ee][0-9]{1,2})?.*//')
     raw_title=$(dots_to_spaces "$raw_title")
     raw_title=$(strip_tags "$raw_title")
+    raw_title=$(echo "$raw_title" | sed -E 's/[-[:space:]]+$//')
 
     show_year=$(echo "$raw_title" | grep -oE '\(?(19|20)[0-9]{2}\)?$' | grep -oE '[0-9]{4}' || true)
     [[ -n "$show_year" ]] && raw_title=$(echo "$raw_title" | sed -E "s/ *\(?$show_year\)? *$//")
@@ -658,8 +651,7 @@ cleanup_sources() {
         while IFS= read -r dir; do
             [[ -z "$dir" ]] && continue
             if [[ -d "$dir" ]] && [[ "$dir" != "$DOWNLOADS" ]]; then
-                find "$dir" -mindepth 1 -delete 2>/dev/null || true
-                rmdir "$dir" 2>/dev/null && echo "  🗑  Removed dir: $(basename "$dir")" || true
+                rm -rf "$dir" && echo "  🗑  Removed dir: $(basename "$dir")" || true
             fi
         done <<< "$unique_dirs"
     fi
@@ -667,61 +659,83 @@ cleanup_sources() {
     echo "✓   Done."
 }
 
-# ── Media library summary ─────────────────────────────────────────────────────
+# ── linuxvm media library summary (via SSH) ───────────────────────────────────
 
-media_summary() {
-    local movies_dir="$HOME/media/Movies"
-    local tv_dir="$HOME/media/TV"
+show_linuxvm_media() {
+    ssh linuxvm bash << 'REMOTE'
+is_video() {
+    local ext="${1##*.}"; ext=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
+    for e in mkv mp4 avi m4v mov wmv mpg mpeg; do [[ "$ext" == "$e" ]] && return 0; done
+    return 1
+}
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📚  Media Library"
+echo ""
+
+movies=()
+while IFS= read -r -d '' f; do
+    is_video "$f" || continue
+    movies+=("$(basename "$f")")
+done < <(find ~/media/Movies -maxdepth 1 -type f -print0 2>/dev/null | sort -z)
+
+if [[ ${#movies[@]} -eq 0 ]]; then
+    echo "  🎬  Movies: (none)"
+else
+    echo "  🎬  Movies (${#movies[@]}):"
+    for m in "${movies[@]}"; do echo "       ${m%.*}"; done
+fi
+
+echo ""
+
+show_dirs=()
+while IFS= read -r -d '' d; do
+    show_dirs+=("$d")
+done < <(find ~/media/TV -maxdepth 1 -mindepth 1 -type d -print0 2>/dev/null | sort -z)
+
+if [[ ${#show_dirs[@]} -eq 0 ]]; then
+    echo "  📺  TV Shows: (none)"
+else
+    echo "  📺  TV Shows (${#show_dirs[@]}):"
+    for show_dir in "${show_dirs[@]}"; do
+        season_count=$(find "$show_dir" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')
+        episode_count=$(find "$show_dir" -type f | wc -l | tr -d ' ')
+        printf "       %-50s  %s season(s), %s ep(s)\n" \
+            "$(basename "$show_dir")" "$season_count" "$episode_count"
+    done
+fi
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+REMOTE
+}
+
+# ── Sync organised files to linuxvm ───────────────────────────────────────────
+
+sync_to_linuxvm() {
+    local src="$HOME/Temp"
 
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "📚  Media Library"
-    echo ""
 
-    local movies=()
-    if [[ -d "$movies_dir" ]]; then
-        while IFS= read -r -d '' f; do
-            is_video "$f" || continue
-            movies+=("$(basename "$f")")
-        done < <(find "$movies_dir" -maxdepth 1 -type f -print0 | sort -z)
+    if [[ -d "$src/Movies" ]]; then
+        echo "📡  Movies: ~/Temp/Movies/ → linuxvm:media/Movies/"
+        rsync -avz --progress --exclude='.DS_Store' "$src/Movies/" "linuxvm:media/Movies/"
     fi
 
-    if [[ ${#movies[@]} -eq 0 ]]; then
-        echo "  🎬  Movies: (none)"
-    else
-        echo "  🎬  Movies (${#movies[@]}):"
-        for m in "${movies[@]}"; do
-            echo "       ${m%.*}"
-        done
+    if [[ -d "$src/TV" ]]; then
+        echo "📡  TV: ~/Temp/TV/ → linuxvm:media/TV/"
+        rsync -avz --progress --exclude='.DS_Store' "$src/TV/" "linuxvm:media/TV/"
     fi
 
     echo ""
-
-    local show_dirs=()
-    if [[ -d "$tv_dir" ]]; then
-        while IFS= read -r -d '' d; do
-            show_dirs+=("$d")
-        done < <(find "$tv_dir" -maxdepth 1 -mindepth 1 -type d -print0 | sort -z)
-    fi
-
-    if [[ ${#show_dirs[@]} -eq 0 ]]; then
-        echo "  📺  TV Shows: (none)"
-    else
-        echo "  📺  TV Shows (${#show_dirs[@]}):"
-        for show_dir in "${show_dirs[@]}"; do
-            local season_count episode_count
-            season_count=$(find "$show_dir" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')
-            episode_count=0
-            while IFS= read -r -d '' f; do
-                is_video "$f" && episode_count=$((episode_count + 1))
-            done < <(find "$show_dir" -type f -print0)
-            printf "       %-50s  %s season(s), %s ep(s)\n" \
-                "$(basename "$show_dir")" "$season_count" "$episode_count"
-        done
-    fi
-
-    echo ""
+    echo "🧹  Cleaning up Mac..."
+    find "$src/" -mindepth 1 -delete 2>/dev/null || true
+    echo "  ✓  Cleared ~/Temp/"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    show_linuxvm_media
 }
 
 # ── Warn if OMDb key is missing ───────────────────────────────────────────────
@@ -735,12 +749,12 @@ if [[ -z "$OMDB_API_KEY" ]]; then
     echo ""
 fi
 
-mkdir -p "$MOVIES" "$TV"
-
 if $SHOW_MEDIA; then
-    media_summary
+    show_linuxvm_media
     exit 0
 fi
+
+mkdir -p "$MOVIES" "$TV"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -781,11 +795,8 @@ echo ""
 
 if ! $DRY_RUN && (( ${#SOURCE_PATHS[@]} > 0 )); then
     cleanup_sources
+    sync_to_linuxvm
     echo ""
-fi
-
-if ! $DRY_RUN; then
-    media_summary
 fi
 
 echo "  Other commands:"

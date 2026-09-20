@@ -309,7 +309,7 @@ db_save() {
     # Remove any existing entry for this key, then append
     local tmp
     tmp=$(mktemp)
-    grep -v -P "^\Q$key\E\t" "$DB_FILE" > "$tmp" 2>/dev/null || true
+    grep -v $'^('"$key"$'\t)' "$DB_FILE" > "$tmp" 2>/dev/null || true
     printf '%s\t%s\n' "$key" "$confirmed" >> "$tmp"
     mv "$tmp" "$DB_FILE"
     echo "  💾  Saved to corrections DB: \"$confirmed\"" >&2
@@ -711,7 +711,10 @@ media_summary() {
         for show_dir in "${show_dirs[@]}"; do
             local season_count episode_count
             season_count=$(find "$show_dir" -maxdepth 1 -mindepth 1 -type d | wc -l | tr -d ' ')
-            episode_count=$(find "$show_dir" -type f | wc -l | tr -d ' ')
+            episode_count=0
+            while IFS= read -r -d '' f; do
+                is_video "$f" && episode_count=$((episode_count + 1))
+            done < <(find "$show_dir" -type f -print0)
             printf "       %-50s  %s season(s), %s ep(s)\n" \
                 "$(basename "$show_dir")" "$season_count" "$episode_count"
         done
