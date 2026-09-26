@@ -6,7 +6,7 @@ A pair of Bash scripts that rename and sort video downloads into a clean `Movies
 
 | Script | For | Output |
 |---|---|---|
-| `organise_media.sh` | Mac | `~/Temp/Movies` and `~/Temp/TV`, then rsync to linuxvm |
+| `organise_media.sh` | Mac | `~/Temp/Movies` and `~/Temp/TV`, then rsync those files to linuxvm |
 | `organise_media_linuxvm.sh` | linuxvm | `~/media/Movies` and `~/media/TV` |
 
 ## How it works
@@ -19,7 +19,7 @@ A pair of Bash scripts that rename and sort video downloads into a clean `Movies
    - TV: `~/Temp/TV/<Show Name (Year)>/Season XX/<Show Name (Year)> SxxExx.ext`
    - Movies: `~/Temp/Movies/<Movie Title (Year)>.ext`
 6. Saves confirmed titles to a local corrections database so repeat runs skip the API lookup
-7. After processing, the Mac script rsyncs the sorted files to `linuxvm:media/` and clears `~/Temp`
+7. After processing, the Mac script rsyncs the files it just sorted to `linuxvm:media/`, then removes only those files (and any show/season folders they leave empty) from `~/Temp`; anything else in `~/Temp` is left alone
 
 ## Requirements
 

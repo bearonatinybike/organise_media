@@ -37,6 +37,7 @@ fi
 VIDEO_EXTENSIONS=("mkv" "mp4" "avi" "m4v" "mov" "wmv" "mpg" "mpeg")
 PROCESSED_FILES=()  # display strings for end-of-run summary
 SOURCE_PATHS=()     # original filepaths of successfully processed files
+PLACED_PATHS=()     # files this run put in $MEDIA (the only ones synced and removed)
 
 # ── Flag parsing ──────────────────────────────────────────────────────────────
 
@@ -500,11 +501,13 @@ process_tv() {
         cp "$filepath" "$dest_dir/$dest_name"
         PROCESSED_FILES+=("TV  │ $dest_dir / $dest_name")
         SOURCE_PATHS+=("$filepath")
+        PLACED_PATHS+=("$dest_dir/$dest_name")
         echo "  ✓  → $dest_dir/$dest_name"
     else
         mv "$filepath" "$dest_dir/$dest_name"
         PROCESSED_FILES+=("TV  │ $dest_dir / $dest_name")
         SOURCE_PATHS+=("$filepath")
+        PLACED_PATHS+=("$dest_dir/$dest_name")
         echo "  ✓  → $dest_dir/$dest_name"
     fi
 }
@@ -598,11 +601,13 @@ process_movie() {
         cp "$filepath" "$MOVIES/$dest_name"
         PROCESSED_FILES+=("Movie │ $dest_name")
         SOURCE_PATHS+=("$filepath")
+        PLACED_PATHS+=("$MOVIES/$dest_name")
         echo "  ✓  → $MOVIES/$dest_name"
     else
         mv "$filepath" "$MOVIES/$dest_name"
         PROCESSED_FILES+=("Movie │ $dest_name")
         SOURCE_PATHS+=("$filepath")
+        PLACED_PATHS+=("$MOVIES/$dest_name")
         echo "  ✓  → $MOVIES/$dest_name"
     fi
 }
@@ -652,6 +657,7 @@ process_as_named() {
     fi
     PROCESSED_FILES+=("$label")
     SOURCE_PATHS+=("$filepath")
+    PLACED_PATHS+=("$dest_dir/$filename")
     echo "  ✓  → $dest_dir/$filename"
 }
 
@@ -769,25 +775,31 @@ REMOTE
 # ── Sync organised files to linuxvm ───────────────────────────────────────────
 
 sync_to_linuxvm() {
-    local src="$HOME/Temp"
+    local src="$MEDIA"
 
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-    if [[ -d "$src/Movies" ]]; then
-        echo "📡  Movies: ~/Temp/Movies/ → linuxvm:media/Movies/"
-        rsync -avz --progress --exclude='.DS_Store' "$src/Movies/" "linuxvm:media/Movies/"
-    fi
-
-    if [[ -d "$src/TV" ]]; then
-        echo "📡  TV: ~/Temp/TV/ → linuxvm:media/TV/"
-        rsync -avz --progress --exclude='.DS_Store' "$src/TV/" "linuxvm:media/TV/"
-    fi
+    # Sync only the files this run placed, never anything else in $MEDIA
+    local list p d
+    list=$(mktemp)
+    for p in "${PLACED_PATHS[@]}"; do printf '%s\n' "${p#"$src"/}"; done > "$list"
+    echo "📡  ${#PLACED_PATHS[@]} file(s): $src/ → linuxvm:media/"
+    rsync -avz --progress --files-from="$list" "$src/" "linuxvm:media/"
+    rm -f "$list"
 
     echo ""
     echo "🧹  Cleaning up Mac..."
-    find "$src/" -mindepth 1 -delete 2>/dev/null || true
-    echo "  ✓  Cleared ~/Temp/"
+    for p in "${PLACED_PATHS[@]}"; do
+        rm -f "$p"
+        # Drop show/season folders left empty (never Movies/ or TV/ themselves)
+        d=$(dirname "$p")
+        while [[ "$d" == "$TV"/* ]]; do
+            rmdir "$d" 2>/dev/null || break
+            d=$(dirname "$d")
+        done
+    done
+    echo "  ✓  Removed ${#PLACED_PATHS[@]} synced file(s) from $src/"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
     show_linuxvm_media
