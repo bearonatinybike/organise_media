@@ -55,6 +55,7 @@ Run options (combinable):
   --copy       Copy files instead of moving them
   --dry-run    Preview what would happen without touching any files
   --auto       Accept the first API match without prompting
+  --as-named   Keep filenames exactly as they are (no lookups or prompts)
 
 Utility commands (sole argument):
   --cleanup    Delete everything inside \$DOWNLOADS
@@ -103,6 +104,7 @@ esac
 COPY_MODE=false
 DRY_RUN=false
 AUTO_MODE=false
+AS_NAMED=false
 SHOW_MEDIA=false
 CONFIRMED_TITLES=()
 
@@ -111,6 +113,7 @@ for arg in "$@"; do
         --copy)       COPY_MODE=true ;;
         --dry-run)    DRY_RUN=true ;;
         --auto)       AUTO_MODE=true ;;
+        --as-named)   AS_NAMED=true ;;
         --show-media) SHOW_MEDIA=true ;;
         *) echo "Unknown option: $arg"; exit 1 ;;
     esac
@@ -604,10 +607,62 @@ process_movie() {
     fi
 }
 
+# ── As-named processing (--as-named) ─────────────────────────────────────────
+# For files that are already named correctly (e.g. tagged RiffTrax downloads):
+# keep the filename exactly, skip lookups, prompts and the corrections DB.
+# TV episodes still go into <Show>/Season NN, with the show taken from the name.
+
+process_as_named() {
+    local filepath="$1"
+    local filename stem se dest_dir label
+    filename=$(basename "$filepath")
+    stem="${filename%.*}"
+    se=$(echo "$stem" | grep -ioE '[Ss][0-9]{1,2}[Ee][0-9]{1,2}(-?[Ee][0-9]{1,2})?' | head -1 | tr '[:lower:]' '[:upper:]' || true)
+
+    if [[ -n "$se" ]]; then
+        local show season_num
+        show=$(echo "$stem" | sed -E 's/[. _-]*[Ss][0-9]{1,2}[Ee][0-9]{1,2}.*//')
+        season_num=$(echo "$se" | grep -oE '[0-9]+' | head -1)
+        dest_dir="$TV/$show/$(printf 'Season %02d' "$((10#$season_num))")"
+        label="TV  │ $show / $filename"
+    else
+        dest_dir="$MOVIES"
+        label="Movie │ $filename"
+    fi
+
+    echo ""
+    echo "  📄  $filename  (as named)"
+
+    if [[ -e "$dest_dir/$filename" ]]; then
+        echo "  ⚠  Already exists, skipping: $dest_dir/$filename"
+        return
+    fi
+
+    if $DRY_RUN; then
+        echo "  🔍  [dry-run] → $dest_dir/$filename"
+        PROCESSED_FILES+=("$label")
+        return
+    fi
+
+    mkdir -p "$dest_dir"
+    if $COPY_MODE; then
+        cp "$filepath" "$dest_dir/$filename"
+    else
+        mv "$filepath" "$dest_dir/$filename"
+    fi
+    PROCESSED_FILES+=("$label")
+    SOURCE_PATHS+=("$filepath")
+    echo "  ✓  → $dest_dir/$filename"
+}
+
 # ── Dispatch ──────────────────────────────────────────────────────────────────
 
 process_file() {
     is_video "$1" || return 0
+    if $AS_NAMED; then
+        process_as_named "$1"
+        return
+    fi
     local stem; stem=$(basename "${1%.*}")
     if echo "$stem" | grep -qiE '[Ss][0-9]{1,2}[Ee][0-9]{1,2}(-?[Ee][0-9]{1,2})?'; then
         process_tv "$1"
@@ -762,6 +817,7 @@ echo "🎬  organise_media.sh"
 $DRY_RUN  && echo "    [dry-run mode — no files will be moved]" || true
 $COPY_MODE && echo "    [copy mode]" || true
 $AUTO_MODE && echo "    [auto mode — accepting first match]" || true
+$AS_NAMED && echo "    [as-named mode — keeping filenames]" || true
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # Top-level files

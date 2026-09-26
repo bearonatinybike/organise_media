@@ -52,6 +52,7 @@ bash organise_media.sh [OPTIONS]
 | `--dry-run` | Preview what would happen without touching any files |
 | `--copy` | Copy files instead of moving them |
 | `--auto` | Accept the first API match without prompting |
+| `--as-named` | Keep filenames exactly as they are: no lookups, prompts or corrections-DB entries. TV episodes (`SxxExx`) still go into `<Show>/Season NN`, with the show taken from the filename. For files that are already named correctly, e.g. tagged RiffTrax downloads. |
 
 ### Utility commands (sole argument)
 
